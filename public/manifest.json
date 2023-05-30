@@ -1,0 +1,10 @@
+{
+  "name": "kintoneDevtools",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "description": "kintoneDevtools",
+  "devtools_page": "devtool.html",
+  "permissions": [
+    "downloads"
+  ]
+}
