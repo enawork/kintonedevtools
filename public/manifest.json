@@ -6,5 +6,8 @@
   "devtools_page": "devtool.html",
   "permissions": [
     "downloads"
+  ],
+  "host_permissions": [
+    "https://*.cybozu.com/*"
   ]
 }
