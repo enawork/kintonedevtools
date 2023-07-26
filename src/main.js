@@ -3,8 +3,10 @@ import { createRoot } from 'react-dom/client'
 import BetterTable from './BetterTable'
 import { Button } from '@mui/material'
 
+let fieldList;
+let subTableList;
+
 const handleContent = content => {
-  console.log(content)
   const blob = new Blob([JSON.stringify(JSON.parse(content), null, 2)], { type: 'application\/json' })
   chrome.downloads.download({ url: URL.createObjectURL(blob) })
 }
@@ -18,20 +20,54 @@ chrome.devtools.network.onRequestFinished.addListener((req) => {
 
 const App = props => {
   const columns = [
+    { title: '', field: '' },
     { title: 'label', field: 'label' },
     { title: 'type', field: 'type' },
     { title: 'var', field: 'var' },
   ]
   const [rows, setRows] = React.useState(props.rows)
+  const [fieldList, setFieldList] = React.useState(props.rows);
+  const [subTables, setSubTables] = React.useState(props.subTables);
+
+  React.useEffect(() => {
+    const url = new URL(window.location.href);
+    console.log(url);
+  }, []);
+
+
+  React.useEffect(() => {
+    if (fieldList && subTables) {
+      const _rows = fieldList.concat(subTables);
+      setRows(_rows);
+    }
+
+  }, [fieldList, subTables]);
+
+
   const handleUpdate = () => {
+    // 基本的なフィールドセット
     chrome.devtools.inspectedWindow.eval(
       "cybozu.data.page.FORM_DATA.schema.table.fieldList",
       function (result, isException) {
         if (isException) {
           console.error(isException);
         } else {
-          const rows = Object.keys(result).map(obj => result[obj]).filter(row => !['RECORD_ID', 'MODIFIER', 'CREATOR', 'MODIFIED_AT', 'CREATED_AT', 'STATUS', 'STATUS_ASSIGNEE', 'CATEGORY'].includes(row.type))
-          setRows(rows)
+          const _fieldList = Object.keys(result).map(obj => result[obj]).filter(row => !['RECORD_ID', 'MODIFIER', 'CREATOR', 'MODIFIED_AT', 'CREATED_AT', 'STATUS', 'STATUS_ASSIGNEE', 'CATEGORY'].includes(row.type))
+          // setRows(rows)
+          setFieldList(_fieldList);
+        }
+      }
+    )
+
+    // サブテーブルとその中のフィールドセット
+    chrome.devtools.inspectedWindow.eval(
+      "cybozu.data.page.FORM_DATA.schema.subTable",
+      function (result, isException) {
+        if (isException) {
+          console.error(isException);
+        } else {
+          const parseTableData = Object.keys(result).map(key => result[key]);
+          setSubTables(parseTableData)
         }
       }
     )
@@ -78,6 +114,7 @@ const App = props => {
         if (isException) {
           console.error(isException);
         } else {
+          console.log(result);
           chrome.devtools.inspectedWindow.eval(
             `kintone.api('/k/v1/app/form/fields.json', 'GET', {app: ${result}})`,
             function (result, isException) {
@@ -106,7 +143,8 @@ const App = props => {
   )
 }
 
-const render = () => {
+// kintoneアプリのフィールド情報取得
+const getFieldList = () => {
   chrome.devtools.inspectedWindow.eval(
     "cybozu.data.page.FORM_DATA.schema.table.fieldList",
     function (result, isException) {
@@ -114,11 +152,47 @@ const render = () => {
         console.error(isException);
       } else {
         const rows = Object.keys(result).map(obj => result[obj]).filter(row => !['RECORD_ID', 'MODIFIER', 'CREATOR', 'MODIFIED_AT', 'CREATED_AT', 'STATUS', 'STATUS_ASSIGNEE', 'CATEGORY'].includes(row.type))
-        const rootEl = document.getElementById('root')
-        const root = createRoot(rootEl)
-        root.render(<App rows={rows} />)
+        fieldList = rows;
       }
     }
   )
 }
-render()
+
+// kintoneアプリのサブテーブル情報取得
+// またサブテーブル情報にはtypeがついていないので、こちらでつけることによってテーブル表示を行っている
+const getSubTableList = () => {
+  chrome.devtools.inspectedWindow.eval(
+    "cybozu.data.page.FORM_DATA.schema.subTable",
+    function (result, isException) {
+      if (isException) {
+        console.error(isException);
+      } else {
+        // const rows = Object.keys(result).map(obj => result[obj]).filter(row => !['RECORD_ID', 'MODIFIER', 'CREATOR', 'MODIFIED_AT', 'CREATED_AT', 'STATUS', 'STATUS_ASSIGNEE', 'CATEGORY'].includes(row.type))
+        const parseTableData = Object.keys(result).map(key => {
+          const tableData = result[key];
+          tableData.type = 'SUBTABLE';
+          return tableData;
+        });
+        subTableList = parseTableData;
+      }
+    }
+  )
+}
+
+const render = () => {
+  let interval = setInterval(() => {
+    if (fieldList && subTableList) {
+      const rootEl = document.getElementById('root');
+      const root = createRoot(rootEl);
+      root.render(<App rows={fieldList} subTables={subTableList} />)
+
+      clearInterval(interval);
+    }
+  }, 200);
+}
+
+
+
+getFieldList()
+getSubTableList()
+render();
