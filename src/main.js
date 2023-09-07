@@ -30,12 +30,6 @@ const App = props => {
   const [subTables, setSubTables] = React.useState(props.subTables);
 
   React.useEffect(() => {
-    const url = new URL(window.location.href);
-    console.log(url);
-  }, []);
-
-
-  React.useEffect(() => {
     if (fieldList && subTables) {
       const _rows = fieldList.concat(subTables);
       setRows(_rows);
